@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.ServiceModel.Syndication;
@@ -129,7 +128,6 @@ namespace Nop.Admin.Controllers
                         }
                     }
                 }
-                
                 return PartialView(model);
             }
             catch (Exception)
@@ -158,7 +156,6 @@ namespace Nop.Admin.Controllers
             //a vendor doesn't have access to this report
             if (_workContext.CurrentVendor != null)
                 return Content("");
-
 
             var model = new CommonStatisticsModel();
 

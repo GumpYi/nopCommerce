@@ -1,6 +1,14 @@
-﻿@model NopCommerceNewsModel
+﻿@using Nop.Core
+@using Nop.Services.Common
+@model NopCommerceNewsModel
 
-<div class="box box-info">
+@{
+    const string panelId = "nopcommerce-news-box";
+    const string hidePanelAttributeName = "HideNopCommerceNewsPanel";
+    var hidePanel = EngineContext.Current.Resolve<IWorkContext>().CurrentCustomer.GetAttribute<bool>(hidePanelAttributeName);
+}
+
+<div class="box box-info @if(hidePanel){<text>collapsed-box</text>}" id="@panelId">
     <div class="box-header with-border clearfix">
         <div class="box-title">
             <i class="fa fa-newspaper-o"></i>
@@ -12,7 +20,14 @@
         </div>
         <div class="box-tools pull-right">
             <button type="button" class="btn btn-box-tool" data-widget="collapse">
-                <i class="fa fa-minus"></i>
+                @if (hidePanel)
+                {
+                    <text><i class="fa fa-plus"></i></text>
+                }
+                else
+                {
+                    <text><i class="fa fa-minus"></i></text>
+                }
             </button>
         </div>
     </div>
@@ -39,34 +54,42 @@
                     </div>
                 </div>
             }
-
         </div>
-    </div>
-    @*<div class="box-footer">
-        <button id="nopcommerceNewsHideAdv" class="btn bg-aqua">
-            @(Model.HideAdvertisements ? T("Admin.NopCommerceNews.ShowAdv") : T("Admin.NopCommerceNews.HideAdv"))
-        </button>
-        <script type="text/javascript">
-            $(document).ready(function () {
-                $('#nopcommerceNewsHideAdv').click(function () {
-                    var postData = {
-                    };
-                    addAntiForgeryToken(postData);
 
-                    $.ajax({
-                        cache: false,
-                        type: "POST",
-                        url: "@(Url.Action("NopCommerceNewsHideAdv", "Home"))",
-                        data: postData,
-                        success: function (data) {
-                            location.reload();
-                        },
-                        error: function (xhr, ajaxOptions, thrownError) {
-                            alert('Failed to change setting.');
-                        }
-                    });
+        <script>
+            $(document).ready(function () {
+                $('#@panelId').on('click', 'button[data-widget="collapse"]', function () {
+                    var collapsed = !$('#@panelId').hasClass('collapsed-box');
+                    saveDashboardPreferences('@(Url.Action("SavePreference", "Preferences"))', '@hidePanelAttributeName', collapsed);
                 });
             });
         </script>
-    </div>*@
+    </div>
+    @*<div class="box-footer">
+            <button id="nopcommerceNewsHideAdv" class="btn bg-aqua">
+                @(Model.HideAdvertisements ? T("Admin.NopCommerceNews.ShowAdv") : T("Admin.NopCommerceNews.HideAdv"))
+            </button>
+            <script type="text/javascript">
+                $(document).ready(function () {
+                    $('#nopcommerceNewsHideAdv').click(function () {
+                        var postData = {
+                        };
+                        addAntiForgeryToken(postData);
+
+                        $.ajax({
+                            cache: false,
+                            type: "POST",
+                            url: "@(Url.Action("NopCommerceNewsHideAdv", "Home"))",
+                            data: postData,
+                            success: function (data) {
+                                location.reload();
+                            },
+                            error: function (xhr, ajaxOptions, thrownError) {
+                                alert('Failed to change setting.');
+                            }
+                        });
+                    });
+                });
+            </script>
+        </div>*@
 </div>
