@@ -1,7 +1,11 @@
 ﻿@using Nop.Core.Domain.Catalog
+@using Nop.Services
 @model ProductModel
 
 <div class="panel-group">
+    <p>
+        @T("Admin.Catalog.Products.SpecificationAttributes.Hint")
+    </p>
     @if (Model.Id > 0)
     {
         /*hide "add spec" table if no attributes are defined*/
@@ -75,7 +79,7 @@
                                     info: false
                                 },
                                 editable: {
-                                    confirmation: false,
+                                    confirmation: "@T("Admin.Common.DeleteConfirmation")",
                                     mode: "inline"
                                 },
                                 scrollable: false,
@@ -333,4 +337,3 @@
         </div>
     }
 </div>
-

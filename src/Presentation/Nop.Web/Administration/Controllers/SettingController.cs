@@ -23,6 +23,7 @@ using Nop.Core.Domain.Seo;
 using Nop.Core.Domain.Shipping;
 using Nop.Core.Domain.Tax;
 using Nop.Core.Domain.Vendors;
+using Nop.Services;
 using Nop.Services.Common;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
@@ -160,6 +161,17 @@ namespace Nop.Admin.Controllers
         #region Methods
 
         [ChildActionOnly]
+        public ActionResult Mode(string modeName = "settings-advanced-mode")
+        {
+            var model = new ModeModel()
+            {
+                ModeName = modeName,
+                Enabled = _workContext.CurrentCustomer.GetAttribute<bool>(modeName)
+            };
+            return PartialView(model);
+        }
+
+        [ChildActionOnly]
         public ActionResult StoreScopeConfiguration()
         {
             var allStores = _storeService.GetAllStores();
@@ -270,6 +282,8 @@ namespace Nop.Admin.Controllers
                 model.AllowCustomersToContactVendors_OverrideForStore = _settingService.SettingExists(vendorSettings, x => x.AllowCustomersToContactVendors, storeScope);
                 model.AllowCustomersToApplyForVendorAccount_OverrideForStore = _settingService.SettingExists(vendorSettings, x => x.AllowCustomersToApplyForVendorAccount, storeScope);
                 model.AllowSearchByVendor_OverrideForStore = _settingService.SettingExists(vendorSettings, x => x.AllowSearchByVendor, storeScope);
+                model.AllowVendorsToEditInfo_OverrideForStore = _settingService.SettingExists(vendorSettings, x => x.AllowVendorsToEditInfo, storeScope);
+                model.NotifyStoreOwnerAboutVendorInformationChange_OverrideForStore = _settingService.SettingExists(vendorSettings, x => x.NotifyStoreOwnerAboutVendorInformationChange, storeScope);
                 model.MaximumProductNumber_OverrideForStore = _settingService.SettingExists(vendorSettings, x => x.MaximumProductNumber, storeScope);
             }
 
@@ -294,6 +308,8 @@ namespace Nop.Admin.Controllers
             _settingService.SaveSettingOverridablePerStore(vendorSettings, x => x.AllowCustomersToContactVendors, model.AllowCustomersToContactVendors_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(vendorSettings, x => x.AllowCustomersToApplyForVendorAccount, model.AllowCustomersToApplyForVendorAccount_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(vendorSettings, x => x.AllowSearchByVendor, model.AllowSearchByVendor_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(vendorSettings, x => x.AllowVendorsToEditInfo, model.AllowVendorsToEditInfo_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(vendorSettings, x => x.NotifyStoreOwnerAboutVendorInformationChange, model.NotifyStoreOwnerAboutVendorInformationChange_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(vendorSettings, x => x.MaximumProductNumber, model.MaximumProductNumber_OverrideForStore, storeScope, false);
 
             //now clear settings cache
@@ -471,8 +487,10 @@ namespace Nop.Admin.Controllers
             model.ActiveStoreScopeConfiguration = storeScope;
             if (storeScope > 0)
             {
+                model.ShipToSameAddress_OverrideForStore = _settingService.SettingExists(shippingSettings, x => x.ShipToSameAddress, storeScope);
                 model.AllowPickUpInStore_OverrideForStore = _settingService.SettingExists(shippingSettings, x => x.AllowPickUpInStore, storeScope);
-                model.PickUpInStoreFee_OverrideForStore = _settingService.SettingExists(shippingSettings, x => x.PickUpInStoreFee, storeScope);
+                model.DisplayPickupPointsOnMap_OverrideForStore = _settingService.SettingExists(shippingSettings, x => x.DisplayPickupPointsOnMap, storeScope);
+                model.GoogleMapsApiKey_OverrideForStore = _settingService.SettingExists(shippingSettings, x => x.GoogleMapsApiKey, storeScope);
                 model.UseWarehouseLocation_OverrideForStore = _settingService.SettingExists(shippingSettings, x => x.UseWarehouseLocation, storeScope);
                 model.NotifyCustomerAboutShippingFromMultipleLocations_OverrideForStore = _settingService.SettingExists(shippingSettings, x => x.NotifyCustomerAboutShippingFromMultipleLocations, storeScope);
                 model.FreeShippingOverXEnabled_OverrideForStore = _settingService.SettingExists(shippingSettings, x => x.FreeShippingOverXEnabled, storeScope);
@@ -498,7 +516,7 @@ namespace Nop.Admin.Controllers
                 model.ShippingOriginAddress.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (originAddress != null && c.Id == originAddress.CountryId) });
 
             var states = originAddress != null && originAddress.Country != null ? _stateProvinceService.GetStateProvincesByCountryId(originAddress.Country.Id, showHidden: true).ToList() : new List<StateProvince>();
-            if (states.Count > 0)
+            if (states.Any())
             {
                 foreach (var s in states)
                     model.ShippingOriginAddress.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (s.Id == originAddress.StateProvinceId) });
@@ -529,8 +547,10 @@ namespace Nop.Admin.Controllers
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
              * and loaded from database after each update */
+            _settingService.SaveSettingOverridablePerStore(shippingSettings, x => x.ShipToSameAddress, model.ShipToSameAddress_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(shippingSettings, x => x.AllowPickUpInStore, model.AllowPickUpInStore_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(shippingSettings, x => x.PickUpInStoreFee, model.PickUpInStoreFee_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(shippingSettings, x => x.DisplayPickupPointsOnMap, model.DisplayPickupPointsOnMap_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(shippingSettings, x => x.GoogleMapsApiKey, model.GoogleMapsApiKey_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(shippingSettings, x => x.UseWarehouseLocation, model.UseWarehouseLocation_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(shippingSettings, x => x.NotifyCustomerAboutShippingFromMultipleLocations, model.NotifyCustomerAboutShippingFromMultipleLocations_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(shippingSettings, x => x.FreeShippingOverXEnabled, model.FreeShippingOverXEnabled_OverrideForStore, storeScope, false);
@@ -648,7 +668,7 @@ namespace Nop.Admin.Controllers
                 model.DefaultTaxAddress.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (defaultAddress != null && c.Id == defaultAddress.CountryId) });
 
             var states = defaultAddress != null && defaultAddress.Country != null ? _stateProvinceService.GetStateProvincesByCountryId(defaultAddress.Country.Id, showHidden: true).ToList() : new List<StateProvince>();
-            if (states.Count > 0)
+            if (states.Any())
             {
                 foreach (var s in states)
                     model.DefaultTaxAddress.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (s.Id == defaultAddress.StateProvinceId) });
@@ -792,11 +812,6 @@ namespace Nop.Admin.Controllers
                 model.ProductsByTagPageSizeOptions_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.ProductsByTagPageSizeOptions, storeScope);
                 model.IncludeShortDescriptionInCompareProducts_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.IncludeShortDescriptionInCompareProducts, storeScope);
                 model.IncludeFullDescriptionInCompareProducts_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.IncludeFullDescriptionInCompareProducts, storeScope);
-                model.IgnoreDiscounts_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.IgnoreDiscounts, storeScope);
-                model.IgnoreFeaturedProducts_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.IgnoreFeaturedProducts, storeScope);
-                model.IgnoreAcl_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.IgnoreAcl, storeScope);
-                model.IgnoreStoreLimitations_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.IgnoreStoreLimitations, storeScope);
-                model.CacheProductPrices_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.CacheProductPrices, storeScope);
                 model.ManufacturersBlockItemsToDisplay_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.ManufacturersBlockItemsToDisplay, storeScope);
                 model.DisplayTaxShippingInfoFooter_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.DisplayTaxShippingInfoFooter, storeScope);
                 model.DisplayTaxShippingInfoProductDetailsPage_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.DisplayTaxShippingInfoProductDetailsPage, storeScope);
@@ -805,6 +820,9 @@ namespace Nop.Admin.Controllers
                 model.DisplayTaxShippingInfoWishlist_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.DisplayTaxShippingInfoWishlist, storeScope);
                 model.DisplayTaxShippingInfoOrderDetailsPage_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.DisplayTaxShippingInfoOrderDetailsPage, storeScope);
                 model.ShowProductReviewsPerStore_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.ShowProductReviewsPerStore, storeScope);
+                model.ShowProductReviewsOnAccountPage_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.ShowProductReviewsTabOnAccountPage, storeScope);
+                model.ProductReviewsPageSizeOnAccountPage_OverrideForStore = _settingService.SettingExists(catalogSettings, x=> x.ProductReviewsPageSizeOnAccountPage, storeScope);
+                model.ExportImportProductAttributes_OverrideForStore = _settingService.SettingExists(catalogSettings, x => x.ExportImportProductAttributes, storeScope);
             }
             return View(model);
         }
@@ -864,11 +882,6 @@ namespace Nop.Admin.Controllers
             _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.ProductsByTagPageSizeOptions, model.ProductsByTagPageSizeOptions_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.IncludeShortDescriptionInCompareProducts, model.IncludeShortDescriptionInCompareProducts_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.IncludeFullDescriptionInCompareProducts, model.IncludeFullDescriptionInCompareProducts_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.IgnoreDiscounts, model.IgnoreDiscounts_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.IgnoreFeaturedProducts, model.IgnoreFeaturedProducts_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.IgnoreAcl, model.IgnoreAcl_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.IgnoreStoreLimitations, model.IgnoreStoreLimitations_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.CacheProductPrices, model.CacheProductPrices_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.ManufacturersBlockItemsToDisplay, model.ManufacturersBlockItemsToDisplay_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.DisplayTaxShippingInfoFooter, model.DisplayTaxShippingInfoFooter_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.DisplayTaxShippingInfoProductDetailsPage, model.DisplayTaxShippingInfoProductDetailsPage_OverrideForStore, storeScope, false);
@@ -877,7 +890,17 @@ namespace Nop.Admin.Controllers
             _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.DisplayTaxShippingInfoWishlist, model.DisplayTaxShippingInfoWishlist_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.DisplayTaxShippingInfoOrderDetailsPage, model.DisplayTaxShippingInfoOrderDetailsPage_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.ShowProductReviewsPerStore, model.ShowProductReviewsPerStore_OverrideForStore, storeScope, false);
-            
+            _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.ShowProductReviewsTabOnAccountPage, model.ShowProductReviewsOnAccountPage_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.ProductReviewsPageSizeOnAccountPage, model.ProductReviewsPageSizeOnAccountPage_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(catalogSettings, x => x.ExportImportProductAttributes, model.ExportImportProductAttributes_OverrideForStore, storeScope, false);
+            //now settings not overridable per store
+            _settingService.SaveSetting(catalogSettings, x => x.IgnoreDiscounts, 0, false);
+            _settingService.SaveSetting(catalogSettings, x => x.IgnoreFeaturedProducts, 0, false);
+            _settingService.SaveSetting(catalogSettings, x => x.IgnoreAcl, 0, false);
+            _settingService.SaveSetting(catalogSettings, x => x.IgnoreStoreLimitations, 0, false);
+            _settingService.SaveSetting(catalogSettings, x => x.CacheProductPrices, 0, false);
+
+
             //now clear settings cache
             _settingService.ClearCache();
 
@@ -885,9 +908,6 @@ namespace Nop.Admin.Controllers
             _customerActivityService.InsertActivity("EditSettings", _localizationService.GetResource("ActivityLog.EditSettings"));
 
             SuccessNotification(_localizationService.GetResource("Admin.Configuration.Updated"));
-
-            //selected tab
-            SaveSelectedTabName();
 
             return RedirectToAction("Catalog");
         }
@@ -1041,6 +1061,7 @@ namespace Nop.Admin.Controllers
                 model.MinOrderSubtotalAmount_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.MinOrderSubtotalAmount, storeScope);
                 model.MinOrderSubtotalAmountIncludingTax_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.MinOrderSubtotalAmountIncludingTax, storeScope);
                 model.MinOrderTotalAmount_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.MinOrderTotalAmount, storeScope);
+                model.AutoUpdateOrderTotalsOnEditingOrder_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.AutoUpdateOrderTotalsOnEditingOrder, storeScope);
                 model.AnonymousCheckoutAllowed_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.AnonymousCheckoutAllowed, storeScope);
                 model.TermsOfServiceOnShoppingCartPage_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.TermsOfServiceOnShoppingCartPage, storeScope);
                 model.TermsOfServiceOnOrderConfirmPage_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.TermsOfServiceOnOrderConfirmPage, storeScope);
@@ -1052,6 +1073,7 @@ namespace Nop.Admin.Controllers
                 model.AttachPdfInvoiceToOrderPaidEmail_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.AttachPdfInvoiceToOrderPaidEmail, storeScope);
                 model.AttachPdfInvoiceToOrderCompletedEmail_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.AttachPdfInvoiceToOrderCompletedEmail, storeScope);
                 model.ReturnRequestsEnabled_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.ReturnRequestsEnabled, storeScope);
+                model.ReturnRequestNumberMask_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.ReturnRequestNumberMask, storeScope);
                 model.NumberOfDaysReturnRequestAvailable_OverrideForStore = _settingService.SettingExists(orderSettings, x => x.NumberOfDaysReturnRequestAvailable, storeScope);
             }
 
@@ -1089,6 +1111,7 @@ namespace Nop.Admin.Controllers
                 _settingService.SaveSettingOverridablePerStore(orderSettings, x => x.MinOrderSubtotalAmount, model.MinOrderSubtotalAmount_OverrideForStore, storeScope, false);
                 _settingService.SaveSettingOverridablePerStore(orderSettings, x => x.MinOrderSubtotalAmountIncludingTax, model.MinOrderSubtotalAmountIncludingTax_OverrideForStore, storeScope, false);
                 _settingService.SaveSettingOverridablePerStore(orderSettings, x => x.MinOrderTotalAmount, model.MinOrderTotalAmount_OverrideForStore, storeScope, false);
+                _settingService.SaveSettingOverridablePerStore(orderSettings, x => x.AutoUpdateOrderTotalsOnEditingOrder, model.AutoUpdateOrderTotalsOnEditingOrder_OverrideForStore, storeScope, false);
                 _settingService.SaveSettingOverridablePerStore(orderSettings, x => x.AnonymousCheckoutAllowed, model.AnonymousCheckoutAllowed_OverrideForStore, storeScope, false);
                 _settingService.SaveSettingOverridablePerStore(orderSettings, x => x.TermsOfServiceOnShoppingCartPage, model.TermsOfServiceOnShoppingCartPage_OverrideForStore, storeScope, false);
                 _settingService.SaveSettingOverridablePerStore(orderSettings, x => x.TermsOfServiceOnOrderConfirmPage, model.TermsOfServiceOnOrderConfirmPage_OverrideForStore, storeScope, false);
@@ -1104,6 +1127,7 @@ namespace Nop.Admin.Controllers
                 _settingService.SaveSetting(orderSettings, x => x.GiftCards_Activated_OrderStatusId, 0, false);
                 _settingService.SaveSetting(orderSettings, x => x.GiftCards_Deactivated_OrderStatusId, 0, false);
                 _settingService.SaveSettingOverridablePerStore(orderSettings, x => x.ReturnRequestsEnabled, model.ReturnRequestsEnabled_OverrideForStore, storeScope, false);
+                _settingService.SaveSettingOverridablePerStore(orderSettings, x => x.ReturnRequestNumberMask, model.ReturnRequestNumberMask_OverrideForStore, storeScope, false);
                
                 //now clear settings cache
                 _settingService.ClearCache();
@@ -1663,6 +1687,7 @@ namespace Nop.Admin.Controllers
                 })
                 .ToList();
             model.StoreInformationSettings.AllowCustomerToSelectTheme = storeInformationSettings.AllowCustomerToSelectTheme;
+            model.StoreInformationSettings.LogoPictureId = storeInformationSettings.LogoPictureId;
             //EU Cookie law
             model.StoreInformationSettings.DisplayEuCookieLawWarning = storeInformationSettings.DisplayEuCookieLawWarning;
             //social pages
@@ -1673,12 +1698,19 @@ namespace Nop.Admin.Controllers
             //contact us
             model.StoreInformationSettings.SubjectFieldOnContactUsForm = commonSettings.SubjectFieldOnContactUsForm;
             model.StoreInformationSettings.UseSystemEmailForContactUsForm = commonSettings.UseSystemEmailForContactUsForm;
+            //sitemap
+            model.StoreInformationSettings.SitemapEnabled = commonSettings.SitemapEnabled;
+            model.StoreInformationSettings.SitemapIncludeCategories = commonSettings.SitemapIncludeCategories;
+            model.StoreInformationSettings.SitemapIncludeManufacturers = commonSettings.SitemapIncludeManufacturers;
+            model.StoreInformationSettings.SitemapIncludeProducts = commonSettings.SitemapIncludeProducts;
+
             //override settings
             if (storeScope > 0)
             {
                 model.StoreInformationSettings.StoreClosed_OverrideForStore = _settingService.SettingExists(storeInformationSettings, x => x.StoreClosed, storeScope);
                 model.StoreInformationSettings.DefaultStoreTheme_OverrideForStore = _settingService.SettingExists(storeInformationSettings, x => x.DefaultStoreTheme, storeScope);
                 model.StoreInformationSettings.AllowCustomerToSelectTheme_OverrideForStore = _settingService.SettingExists(storeInformationSettings, x => x.AllowCustomerToSelectTheme, storeScope);
+                model.StoreInformationSettings.LogoPictureId_OverrideForStore = _settingService.SettingExists(storeInformationSettings, x => x.LogoPictureId, storeScope);
                 model.StoreInformationSettings.DisplayEuCookieLawWarning_OverrideForStore = _settingService.SettingExists(storeInformationSettings, x => x.DisplayEuCookieLawWarning, storeScope);
                 model.StoreInformationSettings.FacebookLink_OverrideForStore = _settingService.SettingExists(storeInformationSettings, x => x.FacebookLink, storeScope);
                 model.StoreInformationSettings.TwitterLink_OverrideForStore = _settingService.SettingExists(storeInformationSettings, x => x.TwitterLink, storeScope);
@@ -1686,6 +1718,10 @@ namespace Nop.Admin.Controllers
                 model.StoreInformationSettings.GooglePlusLink_OverrideForStore = _settingService.SettingExists(storeInformationSettings, x => x.GooglePlusLink, storeScope);
                 model.StoreInformationSettings.SubjectFieldOnContactUsForm_OverrideForStore = _settingService.SettingExists(commonSettings, x => x.SubjectFieldOnContactUsForm, storeScope);
                 model.StoreInformationSettings.UseSystemEmailForContactUsForm_OverrideForStore = _settingService.SettingExists(commonSettings, x => x.UseSystemEmailForContactUsForm, storeScope);
+                model.StoreInformationSettings.SitemapEnabled_OverrideForStore = _settingService.SettingExists(commonSettings, x => x.SitemapEnabled, storeScope);
+                model.StoreInformationSettings.SitemapIncludeCategories_OverrideForStore = _settingService.SettingExists(commonSettings, x => x.SitemapIncludeCategories, storeScope);
+                model.StoreInformationSettings.SitemapIncludeManufacturers_OverrideForStore = _settingService.SettingExists(commonSettings, x => x.SitemapIncludeManufacturers, storeScope);
+                model.StoreInformationSettings.SitemapIncludeProducts_OverrideForStore = _settingService.SettingExists(commonSettings, x => x.SitemapIncludeProducts, storeScope);
             }
 
             //seo settings
@@ -1705,6 +1741,7 @@ namespace Nop.Admin.Controllers
             model.SeoSettings.EnableCssBundling = seoSettings.EnableCssBundling;
             model.SeoSettings.TwitterMetaTags = seoSettings.TwitterMetaTags;
             model.SeoSettings.OpenGraphMetaTags = seoSettings.OpenGraphMetaTags;
+            model.SeoSettings.CustomHeadTags = seoSettings.CustomHeadTags;
             //override settings
             if (storeScope > 0)
             {
@@ -1721,6 +1758,7 @@ namespace Nop.Admin.Controllers
                 model.SeoSettings.EnableCssBundling_OverrideForStore = _settingService.SettingExists(seoSettings, x => x.EnableCssBundling, storeScope);
                 model.SeoSettings.TwitterMetaTags_OverrideForStore = _settingService.SettingExists(seoSettings, x => x.TwitterMetaTags, storeScope);
                 model.SeoSettings.OpenGraphMetaTags_OverrideForStore = _settingService.SettingExists(seoSettings, x => x.OpenGraphMetaTags, storeScope);
+                model.SeoSettings.CustomHeadTags_OverrideForStore = _settingService.SettingExists(seoSettings, x => x.CustomHeadTags, storeScope);
             }
             
             //security settings
@@ -1805,6 +1843,7 @@ namespace Nop.Admin.Controllers
             storeInformationSettings.StoreClosed = model.StoreInformationSettings.StoreClosed;
             storeInformationSettings.DefaultStoreTheme = model.StoreInformationSettings.DefaultStoreTheme;
             storeInformationSettings.AllowCustomerToSelectTheme = model.StoreInformationSettings.AllowCustomerToSelectTheme;
+            storeInformationSettings.LogoPictureId = model.StoreInformationSettings.LogoPictureId;
             //EU Cookie law
             storeInformationSettings.DisplayEuCookieLawWarning = model.StoreInformationSettings.DisplayEuCookieLawWarning;
             //social pages
@@ -1815,6 +1854,11 @@ namespace Nop.Admin.Controllers
             //contact us
             commonSettings.SubjectFieldOnContactUsForm = model.StoreInformationSettings.SubjectFieldOnContactUsForm;
             commonSettings.UseSystemEmailForContactUsForm = model.StoreInformationSettings.UseSystemEmailForContactUsForm;
+            //sitemap
+            commonSettings.SitemapEnabled = model.StoreInformationSettings.SitemapEnabled;
+            commonSettings.SitemapIncludeCategories = model.StoreInformationSettings.SitemapIncludeCategories;
+            commonSettings.SitemapIncludeManufacturers = model.StoreInformationSettings.SitemapIncludeManufacturers;
+            commonSettings.SitemapIncludeProducts = model.StoreInformationSettings.SitemapIncludeProducts;
 
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
@@ -1823,6 +1867,7 @@ namespace Nop.Admin.Controllers
             _settingService.SaveSettingOverridablePerStore(storeInformationSettings, x => x.StoreClosed, model.StoreInformationSettings.StoreClosed_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(storeInformationSettings, x => x.DefaultStoreTheme, model.StoreInformationSettings.DefaultStoreTheme_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(storeInformationSettings, x => x.AllowCustomerToSelectTheme, model.StoreInformationSettings.AllowCustomerToSelectTheme_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(storeInformationSettings, x => x.LogoPictureId, model.StoreInformationSettings.LogoPictureId_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(storeInformationSettings, x => x.DisplayEuCookieLawWarning, model.StoreInformationSettings.DisplayEuCookieLawWarning_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(storeInformationSettings, x => x.FacebookLink, model.StoreInformationSettings.FacebookLink_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(storeInformationSettings, x => x.TwitterLink, model.StoreInformationSettings.TwitterLink_OverrideForStore, storeScope, false);
@@ -1830,7 +1875,11 @@ namespace Nop.Admin.Controllers
             _settingService.SaveSettingOverridablePerStore(storeInformationSettings, x => x.GooglePlusLink, model.StoreInformationSettings.GooglePlusLink_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(commonSettings, x => x.SubjectFieldOnContactUsForm, model.StoreInformationSettings.SubjectFieldOnContactUsForm_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(commonSettings, x => x.UseSystemEmailForContactUsForm, model.StoreInformationSettings.UseSystemEmailForContactUsForm_OverrideForStore, storeScope, false);
-            
+            _settingService.SaveSettingOverridablePerStore(commonSettings, x => x.SitemapEnabled, model.StoreInformationSettings.SitemapEnabled_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(commonSettings, x => x.SitemapIncludeCategories, model.StoreInformationSettings.SitemapIncludeCategories_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(commonSettings, x => x.SitemapIncludeManufacturers, model.StoreInformationSettings.SitemapIncludeManufacturers_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(commonSettings, x => x.SitemapIncludeProducts, model.StoreInformationSettings.SitemapIncludeProducts_OverrideForStore, storeScope, false);
+
             //now clear settings cache
             _settingService.ClearCache();
 
@@ -1851,6 +1900,7 @@ namespace Nop.Admin.Controllers
             seoSettings.EnableCssBundling = model.SeoSettings.EnableCssBundling;
             seoSettings.TwitterMetaTags = model.SeoSettings.TwitterMetaTags;
             seoSettings.OpenGraphMetaTags = model.SeoSettings.OpenGraphMetaTags;
+            seoSettings.CustomHeadTags = model.SeoSettings.CustomHeadTags;
 
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
@@ -1868,6 +1918,7 @@ namespace Nop.Admin.Controllers
             _settingService.SaveSettingOverridablePerStore(seoSettings, x => x.EnableCssBundling, model.SeoSettings.EnableCssBundling_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(seoSettings, x => x.TwitterMetaTags, model.SeoSettings.TwitterMetaTags_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(seoSettings, x => x.OpenGraphMetaTags, model.SeoSettings.OpenGraphMetaTags_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(seoSettings, x => x.CustomHeadTags, model.SeoSettings.CustomHeadTags_OverrideForStore, storeScope, false);
             
             //now clear settings cache
             _settingService.ClearCache();
@@ -1956,10 +2007,7 @@ namespace Nop.Admin.Controllers
             _customerActivityService.InsertActivity("EditSettings", _localizationService.GetResource("ActivityLog.EditSettings"));
 
             SuccessNotification(_localizationService.GetResource("Admin.Configuration.Updated"));
-
-            //selected tab
-            SaveSelectedTabName();
-
+            
             return RedirectToAction("GeneralCommon");
         }
         [HttpPost, ActionName("GeneralCommon")]
@@ -2040,10 +2088,6 @@ namespace Nop.Admin.Controllers
             {
                 ErrorNotification(exc);
             }
-
-            //selected tab
-            SaveSelectedTabName();
-
             return RedirectToAction("GeneralCommon");
         }
         [HttpPost, ActionName("GeneralCommon")]
@@ -2083,10 +2127,7 @@ namespace Nop.Admin.Controllers
             {
                 ErrorNotification(exc);
             }
-
-            //selected tab
-            SaveSelectedTabName();
-
+            
             return RedirectToAction("GeneralCommon");
         }
 

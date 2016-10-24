@@ -15,6 +15,7 @@ using Nop.Core.Domain.Messages;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Security;
 using Nop.Core.Domain.Tax;
+using Nop.Core.Domain.Vendors;
 using Nop.Services.Authentication;
 using Nop.Services.Authentication.External;
 using Nop.Services.Common;
@@ -88,6 +89,8 @@ namespace Nop.Web.Controllers
         private readonly SecuritySettings _securitySettings;
         private readonly ExternalAuthenticationSettings _externalAuthenticationSettings;
         private readonly StoreInformationSettings _storeInformationSettings;
+        private readonly CatalogSettings _catalogSettings;
+        private readonly VendorSettings _vendorSettings;
 
         #endregion
 
@@ -134,7 +137,9 @@ namespace Nop.Web.Controllers
             CaptchaSettings captchaSettings,
             SecuritySettings securitySettings,
             ExternalAuthenticationSettings externalAuthenticationSettings,
-            StoreInformationSettings storeInformationSettings)
+            StoreInformationSettings storeInformationSettings,
+            CatalogSettings catalogSettings, 
+            VendorSettings vendorSettings)
         {
             this._authenticationService = authenticationService;
             this._dateTimeHelper = dateTimeHelper;
@@ -178,6 +183,8 @@ namespace Nop.Web.Controllers
             this._securitySettings = securitySettings;
             this._externalAuthenticationSettings = externalAuthenticationSettings;
             this._storeInformationSettings = storeInformationSettings;
+            this._catalogSettings = catalogSettings;
+            this._vendorSettings = vendorSettings;
         }
 
         #endregion
@@ -276,7 +283,7 @@ namespace Nop.Web.Controllers
                             if (!String.IsNullOrEmpty(selectedAttributesXml))
                             {
                                 var enteredText = _customerAttributeParser.ParseValues(selectedAttributesXml, attribute.Id);
-                                if (enteredText.Count > 0)
+                                if (enteredText.Any())
                                     attributeModel.DefaultValue = enteredText[0];
                             }
                         }
@@ -296,7 +303,7 @@ namespace Nop.Web.Controllers
 
             return result;
         }
-
+        
         [NonAction]
         protected virtual void PrepareCustomerInfoModel(CustomerInfoModel model, Customer customer,
             bool excludeProperties, string overrideCustomCustomerAttributesXml = "")
@@ -367,7 +374,7 @@ namespace Nop.Web.Controllers
                 {
                     //states
                     var states = _stateProvinceService.GetStateProvincesByCountryId(model.CountryId, _workContext.WorkingLanguage.Id).ToList();
-                    if (states.Count > 0)
+                    if (states.Any())
                     {
                         model.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Address.SelectState"), Value = "0" });
 
@@ -504,7 +511,7 @@ namespace Nop.Web.Controllers
                 {
                     //states
                     var states = _stateProvinceService.GetStateProvincesByCountryId(model.CountryId, _workContext.WorkingLanguage.Id).ToList();
-                    if (states.Count > 0)
+                    if (states.Any())
                     {
                         model.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Address.SelectState"), Value = "0" });
 
@@ -1237,21 +1244,24 @@ namespace Nop.Web.Controllers
             {
                 RouteName = "CustomerInfo",
                 Title = _localizationService.GetResource("Account.CustomerInfo"),
-                Tab = CustomerNavigationEnum.Info
+                Tab = CustomerNavigationEnum.Info,
+                ItemClass = "customer-info"
             });
 
             model.CustomerNavigationItems.Add(new CustomerNavigationItemModel
             {
                 RouteName = "CustomerAddresses",
                 Title = _localizationService.GetResource("Account.CustomerAddresses"),
-                Tab = CustomerNavigationEnum.Addresses
+                Tab = CustomerNavigationEnum.Addresses,
+                ItemClass = "customer-addresses"
             });
 
             model.CustomerNavigationItems.Add(new CustomerNavigationItemModel
             {
                 RouteName = "CustomerOrders",
                 Title = _localizationService.GetResource("Account.CustomerOrders"),
-                Tab = CustomerNavigationEnum.Orders
+                Tab = CustomerNavigationEnum.Orders,
+                ItemClass = "customer-orders"
             });
 
             if (_orderSettings.ReturnRequestsEnabled &&
@@ -1262,7 +1272,8 @@ namespace Nop.Web.Controllers
                 {
                     RouteName = "CustomerReturnRequests",
                     Title = _localizationService.GetResource("Account.CustomerReturnRequests"),
-                    Tab = CustomerNavigationEnum.ReturnRequests
+                    Tab = CustomerNavigationEnum.ReturnRequests,
+                    ItemClass = "return-requests"
                 });
             }
 
@@ -1272,7 +1283,8 @@ namespace Nop.Web.Controllers
                 {
                     RouteName = "CustomerDownloadableProducts",
                     Title = _localizationService.GetResource("Account.DownloadableProducts"),
-                    Tab = CustomerNavigationEnum.DownloadableProducts
+                    Tab = CustomerNavigationEnum.DownloadableProducts,
+                    ItemClass = "downloadable-products"
                 });
             }
 
@@ -1282,7 +1294,8 @@ namespace Nop.Web.Controllers
                 {
                     RouteName = "CustomerBackInStockSubscriptions",
                     Title = _localizationService.GetResource("Account.BackInStockSubscriptions"),
-                    Tab = CustomerNavigationEnum.BackInStockSubscriptions
+                    Tab = CustomerNavigationEnum.BackInStockSubscriptions,
+                    ItemClass = "back-in-stock-subscriptions"
                 });
             }
 
@@ -1292,7 +1305,8 @@ namespace Nop.Web.Controllers
                 {
                     RouteName = "CustomerRewardPoints",
                     Title = _localizationService.GetResource("Account.RewardPoints"),
-                    Tab = CustomerNavigationEnum.RewardPoints
+                    Tab = CustomerNavigationEnum.RewardPoints,
+                    ItemClass = "reward-points"
                 });
             }
 
@@ -1300,7 +1314,8 @@ namespace Nop.Web.Controllers
             {
                 RouteName = "CustomerChangePassword",
                 Title = _localizationService.GetResource("Account.ChangePassword"),
-                Tab = CustomerNavigationEnum.ChangePassword
+                Tab = CustomerNavigationEnum.ChangePassword,
+                ItemClass = "change-password"
             });
 
             if (_customerSettings.AllowCustomersToUploadAvatars)
@@ -1309,7 +1324,8 @@ namespace Nop.Web.Controllers
                 {
                     RouteName = "CustomerAvatar",
                     Title = _localizationService.GetResource("Account.Avatar"),
-                    Tab = CustomerNavigationEnum.Avatar
+                    Tab = CustomerNavigationEnum.Avatar,
+                    ItemClass = "customer-avatar"
                 });
             }
 
@@ -1319,7 +1335,28 @@ namespace Nop.Web.Controllers
                 {
                     RouteName = "CustomerForumSubscriptions",
                     Title = _localizationService.GetResource("Account.ForumSubscriptions"),
-                    Tab = CustomerNavigationEnum.ForumSubscriptions
+                    Tab = CustomerNavigationEnum.ForumSubscriptions,
+                    ItemClass = "forum-subscriptions"
+                });
+            }
+            if (_catalogSettings.ShowProductReviewsTabOnAccountPage)
+            {
+                model.CustomerNavigationItems.Add(new CustomerNavigationItemModel
+                {
+                    RouteName = "CustomerProductReviews",
+                    Title = _localizationService.GetResource("Account.CustomerProductReviews"),
+                    Tab = CustomerNavigationEnum.ProductReviews,
+                    ItemClass = "customer-reviews"
+                });
+            }
+            if (_vendorSettings.AllowVendorsToEditInfo && _workContext.CurrentVendor != null)
+            {
+                model.CustomerNavigationItems.Add(new CustomerNavigationItemModel
+                {
+                    RouteName = "CustomerVendorInfo",
+                    Title = _localizationService.GetResource("Account.VendorInfo"),
+                    Tab = CustomerNavigationEnum.VendorInfo,
+                    ItemClass = "customer-vendor-info"
                 });
             }
 

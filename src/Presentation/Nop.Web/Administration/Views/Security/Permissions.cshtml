@@ -27,6 +27,9 @@
             <div class="panel-group">
                 <div class="panel panel-default">
                     <div class="panel-body">
+                        <p>
+                            @T("Admin.Configuration.ACL.Description")
+                        </p>
                         @if (Model.AvailablePermissions.Count == 0)
                         {
                             <text>No permissions defined</text>
@@ -59,8 +62,12 @@
                                     @foreach (var cr in Model.AvailableCustomerRoles)
                                     {
                                         <th scope="col">
-                                            <strong>@cr.Name</strong>
-                                            <input type="checkbox" id="selectall-@(cr.Id)"/>
+                                            <div class="checkbox">
+                                                <label>
+                                                    <input type="checkbox" id="selectall-@(cr.Id)" />
+                                                    <strong>@cr.Name</strong>
+                                                </label>
+                                            </div>
                                         </th>
                                     }
                                 </tr>

@@ -20,6 +20,7 @@ namespace Nop.Web.Models.Customer
         public string RouteName { get; set; }
         public string Title { get; set; }
         public CustomerNavigationEnum Tab { get; set; }
+        public string ItemClass { get; set; }
     }
 
     public enum CustomerNavigationEnum
@@ -33,6 +34,8 @@ namespace Nop.Web.Models.Customer
         RewardPoints = 60,
         ChangePassword = 70,
         Avatar = 80,
-        ForumSubscriptions = 90
+        ForumSubscriptions = 90,
+        ProductReviews = 100,
+        VendorInfo = 110
     }
 }

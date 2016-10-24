@@ -130,14 +130,14 @@
                                             @item.VendorName
                                         </p>
                                     }
-                                    @if (item.ReturnRequestIds.Count > 0)
+                                    @if (item.ReturnRequests.Count > 0)
                                     {
                                         <p>
                                             @T("Admin.Orders.Products.ReturnRequests")<text>:</text>
-                                            @for (int i = 0; i < item.ReturnRequestIds.Count; i++)
+                                            @for (int i = 0; i < item.ReturnRequests.Count; i++)
                                             {
-                                                <a href="@Url.Action("Edit", "ReturnRequest", new {id = item.ReturnRequestIds[i]})">@item.ReturnRequestIds[i]</a>
-                                                if (i != item.ReturnRequestIds.Count - 1)
+                                                <a href="@Url.Action("Edit", "ReturnRequest", new {id = item.ReturnRequests[i].Id})">@item.ReturnRequests[i].CustomNumber</a>
+                                                if (i != item.ReturnRequests.Count - 1)
                                                 {
                                                     <text>,</text>
                                                 }
@@ -345,12 +345,17 @@
                                         <button type="submit" name="btnEditOrderItem@(item.Id)" onclick="toggleOrderItemEdit@(item.Id)(true);return false;" id="btnEditOrderItem@(item.Id)" class="btn btn-sm btn-primary">
                                             @T("Admin.Common.Edit")
                                         </button>
-                                        <button type="submit" name="btnDeleteOrderItem@(item.Id)" id="btnDeleteOrderItem@(item.Id)" class="btn btn-sm bg-red" onclick="return confirm('@T("Admin.Common.AreYouSure")');">
+
+                                        <button type="submit" name="btnDeleteOrderItem@(item.Id)" id="btnDeleteOrderItem@(item.Id)" class="btn btn-sm bg-red">
                                             @T("Admin.Common.Delete")
                                         </button>
-                                        <button type="submit" name="btnSaveOrderItem@(item.Id)" id="btnSaveOrderItem@(item.Id)" class="btn btn-sm btn-primary" style="display: none;" onclick="return confirm('@T("Admin.Common.AreYouSure")');">
+                                        @Html.ActionConfirmation("btnDeleteOrderItem" + item.Id)
+
+                                        <button type="submit" name="btnSaveOrderItem@(item.Id)" id="btnSaveOrderItem@(item.Id)" class="btn btn-sm btn-primary" style="display: none;">
                                             @T("Admin.Common.Save")
                                         </button>
+                                        @Html.ActionConfirmation("btnSaveOrderItem" + item.Id)
+
                                         <button type="submit" name="btnCancelOrderItem@(item.Id)" onclick="toggleOrderItemEdit@(item.Id)(false);return false;" id="btnCancelOrderItem@(item.Id)" class="btn btn-sm bg-teal" style="display: none;">
                                             @T("Admin.Common.Cancel")
                                         </button>

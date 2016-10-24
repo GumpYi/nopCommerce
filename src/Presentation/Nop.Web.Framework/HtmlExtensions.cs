@@ -44,7 +44,7 @@ namespace Nop.Web.Framework
                 if (localizationSupported)
                 {
                     var tabStrip = new StringBuilder();
-                    tabStrip.AppendLine(string.Format("<div id=\"{0}\" class=\"nav-tabs-custom\">", name));
+                    tabStrip.AppendLine(string.Format("<div id=\"{0}\" class=\"nav-tabs-custom nav-tabs-localized-fields\">", name));
                     tabStrip.AppendLine("<ul class=\"nav nav-tabs\">");
 
                     //default tab
@@ -134,6 +134,37 @@ namespace Nop.Web.Framework
             window.AppendLine("<script>");
             window.AppendLine("$(document).ready(function() {");
             window.AppendLine(string.Format("$('#{0}').attr(\"data-toggle\", \"modal\").attr(\"data-target\", \"#{1}\")", buttonsSelector, modalId));
+            window.AppendLine("});");
+            window.AppendLine("</script>");
+
+            return MvcHtmlString.Create(window.ToString());
+        }
+
+        public static MvcHtmlString ActionConfirmation(this HtmlHelper helper, string buttonId, string actionName = "")
+        {
+            if (string.IsNullOrEmpty(actionName))
+                actionName = helper.ViewContext.RouteData.GetRequiredString("action");
+
+            var modalId = MvcHtmlString.Create(buttonId + "-action-confirmation").ToHtmlString();
+
+            var actionConfirmationModel = new ActionConfirmationModel()
+            {
+                ControllerName = helper.ViewContext.RouteData.GetRequiredString("controller"),
+                ActionName = actionName,
+                WindowId = modalId
+            };
+
+            var window = new StringBuilder();
+            window.AppendLine(string.Format("<div id='{0}' class=\"modal fade\"  tabindex=\"-1\" role=\"dialog\" aria-labelledby=\"{0}-title\">", modalId));
+            window.AppendLine(helper.Partial("Confirm", actionConfirmationModel).ToHtmlString());
+            window.AppendLine("</div>");
+
+            window.AppendLine("<script>");
+            window.AppendLine("$(document).ready(function() {");
+            window.AppendLine(string.Format("$('#{0}').attr(\"data-toggle\", \"modal\").attr(\"data-target\", \"#{1}\");", buttonId, modalId));
+            window.AppendLine(string.Format("$('#{0}-submit-button').attr(\"name\", $(\"#{1}\").attr(\"name\"));", modalId, buttonId));
+            window.AppendLine(string.Format("$(\"#{0}\").attr(\"name\", \"\")", buttonId));
+            window.AppendLine(string.Format("if($(\"#{0}\").attr(\"type\") == \"submit\")$(\"#{0}\").attr(\"type\", \"button\")", buttonId));
             window.AppendLine("});");
             window.AppendLine("</script>");
 
@@ -256,9 +287,10 @@ namespace Nop.Web.Framework
         /// <param name="title">Tab title</param>
         /// <param name="isDefaultTab">Indicates that the tab is default</param>
         /// <param name="tabNameToSelect">Tab name to select</param>
+        /// <param name="customCssClass">Tab name to select</param>
         /// <returns>MvcHtmlString</returns>
         public static MvcHtmlString RenderBootstrapTabHeader(this HtmlHelper helper, string currentTabName,
-            LocalizedString title, bool isDefaultTab = false, string tabNameToSelect = "")
+            LocalizedString title, bool isDefaultTab = false, string tabNameToSelect = "", string customCssClass = "")
         {
             if (helper == null)
                 throw new ArgumentNullException("helper");
@@ -279,11 +311,23 @@ namespace Nop.Web.Framework
                 },
                 InnerHtml = title.Text
             };
+            var liClassValue = "";
+            if (tabNameToSelect == currentTabName)
+            {
+                liClassValue = "active";
+            }
+            if (!String.IsNullOrEmpty(customCssClass))
+            {
+                if (!String.IsNullOrEmpty(liClassValue))
+                    liClassValue += " ";
+                liClassValue += customCssClass;
+            }
+
             var li = new TagBuilder("li")
             {
                 Attributes =
                 {
-                    new KeyValuePair<string, string>("class", tabNameToSelect == currentTabName ? "active" : ""),
+                    new KeyValuePair<string, string>("class", liClassValue),
                 },
                 InnerHtml = a.ToString(TagRenderMode.Normal)
             };
@@ -315,14 +359,14 @@ namespace Nop.Web.Framework
 
         public static MvcHtmlString Hint(this HtmlHelper helper, string value)
         {
-            // Create tag builder
+            //create tag builder
             var builder = new TagBuilder("div");
             builder.MergeAttribute("title", value);
             builder.MergeAttribute("class", "ico-help");
             var icon = new StringBuilder();
             icon.Append("<i class='fa fa-question-circle'></i>");
             builder.InnerHtml = icon.ToString();
-            // Render tag
+            //render tag
             return MvcHtmlString.Create(builder.ToString());
         }
 
@@ -333,6 +377,8 @@ namespace Nop.Web.Framework
             var metadata = ModelMetadata.FromLambdaExpression(expression, helper.ViewData);
             var hintResource = string.Empty;
             object value;
+
+            result.Append(helper.LabelFor(expression, new { title = hintResource, @class = "control-label" }));
 
             if (metadata.AdditionalValues.TryGetValue("NopResourceDisplayName", out value))
             {
@@ -348,9 +394,12 @@ namespace Nop.Web.Framework
                     }
                 }
             }
-            result.Append(helper.LabelFor(expression, new { title = hintResource, @class = "control-label" }));
 
-            return MvcHtmlString.Create(result.ToString());
+            var laberWrapper = new TagBuilder("div");
+            laberWrapper.Attributes.Add("class", "label-wrapper");
+            laberWrapper.InnerHtml = result.ToString();
+
+            return MvcHtmlString.Create(laberWrapper.ToString());
         }
 
         public static MvcHtmlString NopEditorFor<TModel, TValue>(this HtmlHelper<TModel> helper,
@@ -400,7 +449,7 @@ namespace Nop.Web.Framework
 
         public static MvcHtmlString NopTextAreaFor<TModel, TValue>(this HtmlHelper<TModel> helper,
             Expression<Func<TModel, TValue>> expression, object htmlAttributes = null,
-            bool renderFormControlClass = true, int rows = 8, int columns = 20)
+            bool renderFormControlClass = true, int rows = 4, int columns = 20)
         {
             var result = new StringBuilder();
 

@@ -23,6 +23,9 @@
         <div class="panel-group">
             <div class="panel panel-default">
                 <div class="panel-body">
+                    <p>
+                        @T("Admin.ReturnRequests.Description")
+                    </p>
                     <div id="returnrequests-grid"></div>
 
                     <script>
@@ -58,14 +61,14 @@
                                     pageSizes: [@(gridPageSizes)]
                                 },
                                 editable: {
-                                    confirmation: false,
+                                    confirmation: "@T("Admin.Common.DeleteConfirmation")",
                                     mode: "inline"
                                 },
                                 scrollable: false,
                                 columns: [
                                     {
-                                        field: "Id",
-                                        title: "@T("Admin.ReturnRequests.Fields.ID")",
+                                        field: "CustomNumber",
+                                        title: "@T("Admin.ReturnRequests.Fields.CustomNumber")",
                                         width: 50
                                     }, {
                                         field: "ProductName",

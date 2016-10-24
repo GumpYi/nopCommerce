@@ -23,7 +23,7 @@
 <div class="content">
     <div class="form-horizontal">
         <div class="panel-group">
-            <div class="panel panel-default panel-search">
+            <div class="panel panel-default panel-search" @(Model.AvailableStores.SelectionIsNotPossible() ? Html.Raw("style=\"display:none\"") : null)>
                 <div class="panel-body">
                     <div class="row">
                         <div class="col-md-6">
@@ -86,7 +86,7 @@
                                     info: false
                                 },
                                 editable: {
-                                    confirmation: false,
+                                    confirmation: "@T("Admin.Common.DeleteConfirmation")",
                                     mode: "inline"
                                 },
                                 scrollable: false,

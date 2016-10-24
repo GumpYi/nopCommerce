@@ -19,6 +19,7 @@ namespace Nop.Admin.Models.Orders
             GiftCards = new List<GiftCard>();
             Items = new List<OrderItemModel>();
             UsedDiscounts = new List<UsedDiscountModel>();
+            Warnings = new List<string>();
         }
 
         public bool IsLoggedInAsVendor { get; set; }
@@ -169,6 +170,9 @@ namespace Nop.Admin.Models.Orders
         //shipping info
         public bool IsShippable { get; set; }
         public bool PickUpInStore { get; set; }
+        [NopResourceDisplayName("Admin.Orders.Fields.PickupAddress")]
+        public AddressModel PickupAddress { get; set; }
+        public string PickupAddressGoogleMapsUrl { get; set; }
         [NopResourceDisplayName("Admin.Orders.Fields.ShippingStatus")]
         public string ShippingStatus { get; set; }
         [NopResourceDisplayName("Admin.Orders.Fields.ShippingStatus")]
@@ -229,14 +233,17 @@ namespace Nop.Admin.Models.Orders
         public bool CanVoid { get; set; }
         public bool CanVoidOffline { get; set; }
 
+        //warnings
+        public List<string> Warnings { get; set; }
+
         #region Nested Classes
 
         public partial class OrderItemModel : BaseNopEntityModel
         {
             public OrderItemModel()
             {
-                ReturnRequestIds = new List<int>();
                 PurchasedGiftCardIds = new List<int>();
+                ReturnRequests = new List<ReturnRequestBriefModel>();
             }
             public int ProductId { get; set; }
             public string ProductName { get; set; }
@@ -265,7 +272,7 @@ namespace Nop.Admin.Models.Orders
             public string AttributeInfo { get; set; }
             public string RecurringInfo { get; set; }
             public string RentalInfo { get; set; }
-            public IList<int> ReturnRequestIds { get; set; }
+            public IList<ReturnRequestBriefModel> ReturnRequests { get; set; }
             public IList<int> PurchasedGiftCardIds { get; set; }
 
             public bool IsDownload { get; set; }
@@ -273,6 +280,15 @@ namespace Nop.Admin.Models.Orders
             public DownloadActivationType DownloadActivationType { get; set; }
             public bool IsDownloadActivated { get; set; }
             public Guid LicenseDownloadGuid { get; set; }
+
+            #region Nested Classes
+
+            public partial class ReturnRequestBriefModel : BaseNopEntityModel
+            {
+                public string CustomNumber { get; set; }
+            }
+
+            #endregion
         }
 
         public partial class TaxRate : BaseNopModel
@@ -396,6 +412,7 @@ namespace Nop.Admin.Models.Orders
                 /// </summary>
                 public bool HasCondition { get; set; }
 
+                public bool AutoUpdateOrderTotals { get; set; }
             }
 
             public partial class ProductAttributeModel : BaseNopEntityModel

@@ -80,6 +80,7 @@ namespace Nop.Web.Extensions
             ITaxService taxService,
             ICurrencyService currencyService,
             IPictureService pictureService,
+            IMeasureService measureService,
             IWebHelper webHelper,
             ICacheManager cacheManager,
             CatalogSettings catalogSettings,
@@ -182,6 +183,10 @@ namespace Nop.Web.Extensions
                                                         priceModel.OldPrice = null;
                                                         priceModel.Price = String.Format(localizationService.GetResource("Products.PriceRangeFrom"), priceFormatter.FormatPrice(finalPrice));
                                                         priceModel.PriceValue = finalPrice;
+
+                                                        //PAngV baseprice (used in Germany)
+                                                        priceModel.BasePricePAngV = product.FormatBasePrice(finalPrice,
+                                                            localizationService, measureService, currencyService, workContext, priceFormatter);
                                                     }
                                                     else
                                                     {
@@ -271,7 +276,7 @@ namespace Nop.Web.Extensions
                                             }
                                             //When there is just one tier (with  qty 1), 
                                             //there are no actual savings in the list.
-                                            bool displayFromMessage = tierPrices.Count > 0 &&
+                                            bool displayFromMessage = tierPrices.Any() &&
                                                 !(tierPrices.Count == 1 && tierPrices[0].Quantity <= 1);
                                             if (displayFromMessage)
                                             {
@@ -308,6 +313,11 @@ namespace Nop.Web.Extensions
                                             priceModel.DisplayTaxShippingInfo = catalogSettings.DisplayTaxShippingInfoProductBoxes
                                                 && product.IsShipEnabled &&
                                                 !product.IsFreeShipping;
+
+
+                                            //PAngV baseprice (used in Germany)
+                                            priceModel.BasePricePAngV = product.FormatBasePrice(finalPrice,
+                                                localizationService, measureService, currencyService, workContext, priceFormatter);
                                         }
                                     }
                                 }

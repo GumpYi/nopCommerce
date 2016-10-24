@@ -54,6 +54,7 @@ namespace Nop.Services.Catalog
         private readonly IRepository<ProductSpecificationAttribute> _productSpecificationAttributeRepository;
         private readonly IRepository<ProductReview> _productReviewRepository;
         private readonly IRepository<ProductWarehouseInventory> _productWarehouseInventoryRepository;
+        private readonly IRepository<SpecificationAttributeOption> _specificationAttributeOptionRepository;
         private readonly IProductAttributeService _productAttributeService;
         private readonly IProductAttributeParser _productAttributeParser;
         private readonly ILanguageService _languageService;
@@ -87,6 +88,7 @@ namespace Nop.Services.Catalog
         /// <param name="productPictureRepository">Product picture repository</param>
         /// <param name="productSpecificationAttributeRepository">Product specification attribute repository</param>
         /// <param name="productReviewRepository">Product review repository</param>
+        /// <param name="specificationAttributeOptionRepository">Specification attribute option repository</param>
         /// <param name="productWarehouseInventoryRepository">Product warehouse inventory repository</param>
         /// <param name="productAttributeService">Product attribute service</param>
         /// <param name="productAttributeParser">Product attribute parser service</param>
@@ -113,6 +115,7 @@ namespace Nop.Services.Catalog
             IRepository<ProductSpecificationAttribute> productSpecificationAttributeRepository,
             IRepository<ProductReview>  productReviewRepository,
             IRepository<ProductWarehouseInventory> productWarehouseInventoryRepository,
+            IRepository<SpecificationAttributeOption> specificationAttributeOptionRepository,
             IProductAttributeService productAttributeService,
             IProductAttributeParser productAttributeParser,
             ILanguageService languageService,
@@ -139,6 +142,7 @@ namespace Nop.Services.Catalog
             this._productSpecificationAttributeRepository = productSpecificationAttributeRepository;
             this._productReviewRepository = productReviewRepository;
             this._productWarehouseInventoryRepository = productWarehouseInventoryRepository;
+            this._specificationAttributeOptionRepository = specificationAttributeOptionRepository;
             this._productAttributeService = productAttributeService;
             this._productAttributeParser = productAttributeParser;
             this._languageService = languageService;
@@ -319,7 +323,7 @@ namespace Nop.Services.Catalog
             query = query.Where(p => !p.Deleted && p.Published && p.VisibleIndividually);
 
             //category filtering
-            if (categoryIds != null && categoryIds.Count > 0)
+            if (categoryIds != null && categoryIds.Any())
             {
                 query = from p in query
                         from pc in p.ProductCategories.Where(pc => categoryIds.Contains(pc.CategoryId))
@@ -417,8 +421,8 @@ namespace Nop.Services.Catalog
                 pageIndex, pageSize, categoryIds, manufacturerId,
                 storeId, vendorId, warehouseId,
                 productType, visibleIndividuallyOnly, markedAsNewOnly, featuredProducts,
-                priceMin, priceMax, productTagId, keywords, searchDescriptions, searchSku,
-                searchProductTags, searchManufacturerPartNumber, languageId, filteredSpecs, 
+                priceMin, priceMax, productTagId, keywords, searchDescriptions, searchManufacturerPartNumber, searchSku,
+                searchProductTags, languageId, filteredSpecs, 
                 orderBy, showHidden, overridePublished);
         }
 
@@ -649,7 +653,7 @@ namespace Nop.Services.Catalog
 
                 var pAllowedCustomerRoleIds = _dataProvider.GetParameter();
                 pAllowedCustomerRoleIds.ParameterName = "AllowedCustomerRoleIds";
-                pAllowedCustomerRoleIds.Value = commaSeparatedAllowedCustomerRoleIds;
+                pAllowedCustomerRoleIds.Value = !_catalogSettings.IgnoreAcl ? commaSeparatedAllowedCustomerRoleIds : "";
                 pAllowedCustomerRoleIds.DbType = DbType.String;
 
                 var pPageIndex = _dataProvider.GetParameter();
@@ -876,21 +880,9 @@ namespace Nop.Services.Catalog
                             where !p.LimitedToStores || storeId == sm.StoreId
                             select p;
                 }
-                
-                //search by specs
-                if (filteredSpecs != null && filteredSpecs.Count > 0)
-                {
-                    query = from p in query
-                            where !filteredSpecs
-                                       .Except(
-                                           p.ProductSpecificationAttributes.Where(psa => psa.AllowFiltering).Select(
-                                               psa => psa.SpecificationAttributeOptionId))
-                                       .Any()
-                            select p;
-                }
 
                 //category filtering
-                if (categoryIds != null && categoryIds.Count > 0)
+                if (categoryIds != null && categoryIds.Any())
                 {
                     query = from p in query
                             from pc in p.ProductCategories.Where(pc => categoryIds.Contains(pc.CategoryId))
@@ -948,6 +940,33 @@ namespace Nop.Services.Catalog
                             select p;
                 }
 
+                //get filterable specification attribute option identifier
+                if (loadFilterableSpecificationAttributeOptionIds)
+                {
+                    var querySpecs = from p in query
+                                     join psa in _productSpecificationAttributeRepository.Table on p.Id equals psa.ProductId
+                                     where psa.AllowFiltering
+                                     select psa.SpecificationAttributeOptionId;
+                    //only distinct attributes
+                    filterableSpecificationAttributeOptionIds = querySpecs.Distinct().ToList();
+                }
+
+                //search by specs
+                if (filteredSpecs != null && filteredSpecs.Any())
+                {
+                    var filteredAttributes = _specificationAttributeOptionRepository.Table
+                        .Where(sao => filteredSpecs.Contains(sao.Id)).Select(sao => sao.SpecificationAttributeId).Distinct();
+
+                    query = query.Where(p => !filteredAttributes.Except
+                        (
+                            _specificationAttributeOptionRepository.Table.Where(
+                                sao => p.ProductSpecificationAttributes.Where(
+                                    psa => psa.AllowFiltering && filteredSpecs.Contains(psa.SpecificationAttributeOptionId))
+                                .Select(psa => psa.SpecificationAttributeOptionId).Contains(sao.Id))
+                            .Select(sao => sao.SpecificationAttributeId).Distinct()
+                        ).Any());
+                }
+
                 //only distinct products (group by ID)
                 //if we use standard Distinct() method, then all fields will be compared (low performance)
                 //it'll not work in SQL Server Compact when searching products by a keyword)
@@ -958,7 +977,7 @@ namespace Nop.Services.Catalog
                         select pGroup.FirstOrDefault();
 
                 //sort products
-                if (orderBy == ProductSortingEnum.Position && categoryIds != null && categoryIds.Count > 0)
+                if (orderBy == ProductSortingEnum.Position && categoryIds != null && categoryIds.Any())
                 {
                     //category position
                     var firstCategoryId = categoryIds[0];
@@ -1008,18 +1027,6 @@ namespace Nop.Services.Catalog
 
                 var products = new PagedList<Product>(query, pageIndex, pageSize);
 
-                //get filterable specification attribute option identifier
-                if (loadFilterableSpecificationAttributeOptionIds)
-                {
-                    var querySpecs = from p in query
-                                     join psa in _productSpecificationAttributeRepository.Table on p.Id equals psa.ProductId
-                                     where psa.AllowFiltering
-                                     select psa.SpecificationAttributeOptionId;
-                    //only distinct attributes
-                    filterableSpecificationAttributeOptionIds = querySpecs
-                        .Distinct()
-                        .ToList();
-                }
 
                 //return products
                 return products;
@@ -1226,7 +1233,7 @@ namespace Nop.Services.Catalog
             if (product == null)
                 throw new ArgumentNullException("product");
 
-            product.HasTierPrices = product.TierPrices.Count > 0;
+            product.HasTierPrices = product.TierPrices.Any();
             UpdateProduct(product);
         }
 
@@ -1239,7 +1246,7 @@ namespace Nop.Services.Catalog
             if (product == null)
                 throw new ArgumentNullException("product");
 
-            product.HasDiscountsApplied = product.AppliedDiscounts.Count > 0;
+            product.HasDiscountsApplied = product.AppliedDiscounts.Any();
             UpdateProduct(product);
         }
 
@@ -1729,7 +1736,7 @@ namespace Nop.Services.Catalog
             if (numberOfProducts == 0)
                 return result;
 
-            if (cart == null || cart.Count == 0)
+            if (cart == null || !cart.Any())
                 return result;
 
             var cartProductIds = new List<int>();
@@ -1934,10 +1941,13 @@ namespace Nop.Services.Catalog
         /// <param name="message">Search title or review text; null to load all records</param>
         /// <param name="storeId">The store identifier; pass 0 to load all records</param>
         /// <param name="productId">The product identifier; pass 0 to load all records</param>
+        /// <param name="pageIndex">Page index</param>
+        /// <param name="pageSize">Page size</param>
         /// <returns>Reviews</returns>
-        public virtual IList<ProductReview> GetAllProductReviews(int customerId, bool? approved,
+        public virtual IPagedList<ProductReview> GetAllProductReviews(int customerId, bool? approved,
             DateTime? fromUtc = null, DateTime? toUtc = null,
-            string message = null, int storeId = 0, int productId = 0)
+            string message = null, int storeId = 0, int productId = 0,
+            int pageIndex = 0, int pageSize = int.MaxValue)
         {
             var query = _productReviewRepository.Table;
             if (approved.HasValue)
@@ -1956,8 +1966,10 @@ namespace Nop.Services.Catalog
                 query = query.Where(c => c.ProductId == productId);
 
             query = query.OrderBy(c => c.CreatedOnUtc);
-            var content = query.ToList();
-            return content;
+
+            var productReviews = new PagedList<ProductReview>(query, pageIndex, pageSize);
+
+            return productReviews;
         }
 
         /// <summary>
