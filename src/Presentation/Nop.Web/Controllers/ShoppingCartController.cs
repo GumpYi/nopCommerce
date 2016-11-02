@@ -31,6 +31,7 @@ using Nop.Services.Payments;
 using Nop.Services.Security;
 using Nop.Services.Seo;
 using Nop.Services.Shipping;
+using Nop.Services.Shipping.Date;
 using Nop.Services.Tax;
 using Nop.Web.Extensions;
 using Nop.Web.Framework.Controllers;
@@ -70,6 +71,7 @@ namespace Nop.Web.Controllers
         private readonly ICountryService _countryService;
         private readonly IStateProvinceService _stateProvinceService;
         private readonly IShippingService _shippingService;
+        private readonly IDateRangeService _dateRangeService;
         private readonly IOrderTotalCalculationService _orderTotalCalculationService;
         private readonly ICheckoutAttributeService _checkoutAttributeService;
         private readonly IPaymentService _paymentService;
@@ -118,7 +120,8 @@ namespace Nop.Web.Controllers
             IGiftCardService giftCardService,
             ICountryService countryService,
             IStateProvinceService stateProvinceService,
-            IShippingService shippingService, 
+            IShippingService shippingService,
+            IDateRangeService dateRangeService,
             IOrderTotalCalculationService orderTotalCalculationService,
             ICheckoutAttributeService checkoutAttributeService, 
             IPaymentService paymentService,
@@ -164,6 +167,7 @@ namespace Nop.Web.Controllers
             this._countryService = countryService;
             this._stateProvinceService = stateProvinceService;
             this._shippingService = shippingService;
+            this._dateRangeService = dateRangeService;
             this._orderTotalCalculationService = orderTotalCalculationService;
             this._checkoutAttributeService = checkoutAttributeService;
             this._paymentService = paymentService;
@@ -261,14 +265,23 @@ namespace Nop.Web.Controllers
             model.TermsOfServiceOnOrderConfirmPage = _orderSettings.TermsOfServiceOnOrderConfirmPage;
             model.DisplayTaxShippingInfo = _catalogSettings.DisplayTaxShippingInfoShoppingCart;
 
-            //gift card and gift card boxes
+            //discount and gift card boxes
             model.DiscountBox.Display= _shoppingCartSettings.ShowDiscountBox;
-            var discountCouponCode = _workContext.CurrentCustomer.GetAttribute<string>(SystemCustomerAttributeNames.DiscountCouponCode);
-            var discount = _discountService.GetDiscountByCouponCode(discountCouponCode);
-            if (discount != null &&
-                discount.RequiresCouponCode &&
-                _discountService.ValidateDiscount(discount, _workContext.CurrentCustomer).IsValid)
-                model.DiscountBox.CurrentCode = discount.CouponCode;
+            var discountCouponCodes = _workContext.CurrentCustomer.ParseAppliedDiscountCouponCodes();
+            foreach (var couponCode in discountCouponCodes)
+            {
+                var discount = _discountService.GetDiscountByCouponCode(couponCode);
+                if (discount != null &&
+                    discount.RequiresCouponCode &&
+                    _discountService.ValidateDiscount(discount, _workContext.CurrentCustomer).IsValid)
+                {
+                    model.DiscountBox.AppliedDiscountsWithCodes.Add(new ShoppingCartModel.DiscountBoxModel.DiscountInfoModel()
+                    {
+                        Id = discount.Id,
+                        CouponCode = discount.CouponCode
+                    });
+                }
+            }
             model.GiftCardBox.Display = _shoppingCartSettings.ShowGiftCardBox;
 
             //cart warnings
@@ -953,8 +966,6 @@ namespace Nop.Web.Controllers
                 {
                     decimal orderSubTotalDiscountAmount = _currencyService.ConvertFromPrimaryStoreCurrency(orderSubTotalDiscountAmountBase, _workContext.WorkingCurrency);
                     model.SubTotalDiscount = _priceFormatter.FormatPrice(-orderSubTotalDiscountAmount, true, _workContext.WorkingCurrency, _workContext.WorkingLanguage, subTotalIncludingTax);
-                    model.AllowRemovingSubTotalDiscount = model.IsEditable && 
-                        orderSubTotalAppliedDiscounts.Any(d => d.RequiresCouponCode && !String.IsNullOrEmpty(d.CouponCode));
                 }
 
 
@@ -1046,8 +1057,6 @@ namespace Nop.Web.Controllers
                 {
                     decimal orderTotalDiscountAmount = _currencyService.ConvertFromPrimaryStoreCurrency(orderTotalDiscountAmountBase, _workContext.WorkingCurrency);
                     model.OrderTotalDiscount = _priceFormatter.FormatPrice(-orderTotalDiscountAmount, true, false);
-                    model.AllowRemovingOrderTotalDiscount = model.IsEditable &&
-                        orderTotalAppliedDiscounts.Any(d => d.RequiresCouponCode && !String.IsNullOrEmpty(d.CouponCode));
                 }
 
                 //gift cards
@@ -1898,7 +1907,7 @@ namespace Nop.Web.Controllers
             }
 
             //stock
-            var stockAvailability = product.FormatStockMessage(attributeXml, _localizationService, _productAttributeParser);
+            var stockAvailability = product.FormatStockMessage(attributeXml, _localizationService, _productAttributeParser, _dateRangeService);
 
             //conditional attributes
             var enabledAttributeMappingIds = new List<int>();
@@ -2353,7 +2362,7 @@ namespace Nop.Web.Controllers
                     if (validationResult.IsValid)
                     {
                         //valid
-                        _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer, SystemCustomerAttributeNames.DiscountCouponCode, discountcouponcode);
+                        _workContext.CurrentCustomer.ApplyDiscountCouponCode(discountcouponcode);
                         model.DiscountBox.Message = _localizationService.GetResource("ShoppingCart.DiscountCouponCode.Applied");
                         model.DiscountBox.IsApplied = true;
                     }
@@ -2419,7 +2428,6 @@ namespace Nop.Web.Controllers
                     if (isGiftCardValid)
                     {
                         _workContext.CurrentCustomer.ApplyGiftCardCouponCode(giftcardcouponcode);
-                        _customerService.UpdateCustomer(_workContext.CurrentCustomer);
                         model.GiftCardBox.Message = _localizationService.GetResource("ShoppingCart.GiftCardCouponCode.Applied");
                         model.GiftCardBox.IsApplied = true;
                     }
@@ -2545,18 +2553,25 @@ namespace Nop.Web.Controllers
 
         [ValidateInput(false)]
         [HttpPost, ActionName("Cart")]
-        [FormValueRequired("removesubtotaldiscount", "removeordertotaldiscount", "removediscountcouponcode")]
-        public ActionResult RemoveDiscountCoupon()
+        [FormValueRequired(FormValueRequirement.StartsWith, "removediscount-")]
+        public ActionResult RemoveDiscountCoupon(FormCollection form)
         {
+            var model = new ShoppingCartModel();
+
+            //get discount identifier
+            int discountId = 0;
+            foreach (var formValue in form.AllKeys)
+                if (formValue.StartsWith("removediscount-", StringComparison.InvariantCultureIgnoreCase))
+                    discountId = Convert.ToInt32(formValue.Substring("removediscount-".Length));
+            var discount = _discountService.GetDiscountById(discountId);
+            if (discount != null)
+                _workContext.CurrentCustomer.RemoveDiscountCouponCode(discount.CouponCode);
+
+
             var cart = _workContext.CurrentCustomer.ShoppingCartItems
                 .Where(sci => sci.ShoppingCartType == ShoppingCartType.ShoppingCart)
                 .LimitPerStore(_storeContext.CurrentStore.Id)
                 .ToList();
-            var model = new ShoppingCartModel();
-
-            _genericAttributeService.SaveAttribute<string>(_workContext.CurrentCustomer,
-                SystemCustomerAttributeNames.DiscountCouponCode, null);
-
             PrepareShoppingCartModel(model, cart);
             return View(model);
         }
@@ -2575,10 +2590,7 @@ namespace Nop.Web.Controllers
                     giftCardId = Convert.ToInt32(formValue.Substring("removegiftcard-".Length));
             var gc = _giftCardService.GetGiftCardById(giftCardId);
             if (gc != null)
-            {
                 _workContext.CurrentCustomer.RemoveGiftCardCouponCode(gc.GiftCardCouponCode);
-                _customerService.UpdateCustomer(_workContext.CurrentCustomer);
-            }
 
             var cart = _workContext.CurrentCustomer.ShoppingCartItems
                 .Where(sci => sci.ShoppingCartType == ShoppingCartType.ShoppingCart)
