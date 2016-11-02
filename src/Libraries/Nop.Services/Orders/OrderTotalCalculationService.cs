@@ -515,7 +515,7 @@ namespace Nop.Services.Orders
                             //customer chose pickup in store method, try to get chosen pickup point
                             if (_shippingSettings.AllowPickUpInStore)
                             {
-                                var pickupPointsResponse = _shippingService.GetPickupPoints(updatedOrder.BillingAddress,
+                                var pickupPointsResponse = _shippingService.GetPickupPoints(updatedOrder.BillingAddress, updatedOrder.Customer,
                                     updatedOrder.ShippingRateComputationMethodSystemName, _storeContext.CurrentStore.Id);
                                 if (pickupPointsResponse.Success)
                                 {
@@ -535,7 +535,7 @@ namespace Nop.Services.Orders
                         {
                             //customer chose shipping to address, try to get chosen shipping option
                             var shippingOptionsResponse = _shippingService.GetShippingOptions(restoredCart,
-                                updatedOrder.ShippingAddress, updatedOrder.ShippingRateComputationMethodSystemName, _storeContext.CurrentStore.Id);
+                                updatedOrder.ShippingAddress, updatedOrder.Customer, updatedOrder.ShippingRateComputationMethodSystemName, _storeContext.CurrentStore.Id);
                             if (shippingOptionsResponse.Success)
                             {
                                 var shippingOption = shippingOptionsResponse.ShippingOptions.FirstOrDefault(option => updatedOrder.ShippingMethod.Contains(option.Name));
@@ -554,7 +554,7 @@ namespace Nop.Services.Orders
                         if (_shippingSettings.AllowPickUpInStore)
                         {
                             //try to get the cheapest pickup point
-                            var pickupPointsResponse = _shippingService.GetPickupPoints(updatedOrder.BillingAddress, null, _storeContext.CurrentStore.Id);
+                            var pickupPointsResponse = _shippingService.GetPickupPoints(updatedOrder.BillingAddress, _workContext.CurrentCustomer, storeId: _storeContext.CurrentStore.Id);
                             if (pickupPointsResponse.Success)
                             {
                                 updateOrderParameters.PickupPoint = pickupPointsResponse.PickupPoints.OrderBy(point => point.PickupFee).First();
@@ -569,10 +569,10 @@ namespace Nop.Services.Orders
                         if (updateOrderParameters.PickupPoint == null)
                         {
                             //or try to get the cheapest shipping option for the shipping to the customer address 
-                            var shippingRateComputationMethods = _shippingService.LoadActiveShippingRateComputationMethods(_storeContext.CurrentStore.Id);
+                            var shippingRateComputationMethods = _shippingService.LoadActiveShippingRateComputationMethods(_workContext.CurrentCustomer, _storeContext.CurrentStore.Id);
                             if (shippingRateComputationMethods.Any())
                             {
-                                var shippingOptionsResponse = _shippingService.GetShippingOptions(restoredCart, customer.ShippingAddress, null, _storeContext.CurrentStore.Id);
+                                var shippingOptionsResponse = _shippingService.GetShippingOptions(restoredCart, customer.ShippingAddress, _workContext.CurrentCustomer, storeId: _storeContext.CurrentStore.Id);
                                 if (shippingOptionsResponse.Success)
                                 {
                                     var shippingOption = shippingOptionsResponse.ShippingOptions.OrderBy(option => option.Rate).First();
@@ -937,9 +937,9 @@ namespace Nop.Services.Orders
                 if (customer != null)
                     shippingAddress = customer.ShippingAddress;
 
-                var shippingRateComputationMethods = _shippingService.LoadActiveShippingRateComputationMethods(_storeContext.CurrentStore.Id);
+                var shippingRateComputationMethods = _shippingService.LoadActiveShippingRateComputationMethods(_workContext.CurrentCustomer, _storeContext.CurrentStore.Id);
                 if (!shippingRateComputationMethods.Any() && !_shippingSettings.AllowPickUpInStore)
-                        throw new NopException("Shipping rate computation method could not be loaded");
+                    throw new NopException("Shipping rate computation method could not be loaded");
 
                 if (shippingRateComputationMethods.Count == 1)
                 {
@@ -1136,11 +1136,11 @@ namespace Nop.Services.Orders
         /// Gets shopping cart total
         /// </summary>
         /// <param name="cart">Cart</param>
-        /// <param name="ignoreRewardPonts">A value indicating whether we should ignore reward points (if enabled and a customer is going to use them)</param>
+        /// <param name="useRewardPoints">A value indicating reward points should be used; null to detect current choice of the customer</param>
         /// <param name="usePaymentMethodAdditionalFee">A value indicating whether we should use payment method additional fee when calculating order total</param>
         /// <returns>Shopping cart total;Null if shopping cart total couldn't be calculated now</returns>
         public virtual decimal? GetShoppingCartTotal(IList<ShoppingCartItem> cart,
-            bool ignoreRewardPonts = false, bool usePaymentMethodAdditionalFee = true)
+            bool? useRewardPoints = null,  bool usePaymentMethodAdditionalFee = true)
         {
             decimal discountAmount;
             List<Discount> appliedDiscounts;
@@ -1152,8 +1152,8 @@ namespace Nop.Services.Orders
                 out appliedDiscounts,
                 out appliedGiftCards,
                 out redeemedRewardPoints, 
-                out redeemedRewardPointsAmount, 
-                ignoreRewardPonts,
+                out redeemedRewardPointsAmount,
+                useRewardPoints,
                 usePaymentMethodAdditionalFee);
         }
 
@@ -1166,14 +1166,14 @@ namespace Nop.Services.Orders
         /// <param name="appliedDiscounts">Applied discounts</param>
         /// <param name="redeemedRewardPoints">Reward points to redeem</param>
         /// <param name="redeemedRewardPointsAmount">Reward points amount in primary store currency to redeem</param>
-        /// <param name="ignoreRewardPonts">A value indicating whether we should ignore reward points (if enabled and a customer is going to use them)</param>
+        /// <param name="useRewardPoints">A value indicating reward points should be used; null to detect current choice of the customer</param>
         /// <param name="usePaymentMethodAdditionalFee">A value indicating whether we should use payment method additional fee when calculating order total</param>
         /// <returns>Shopping cart total;Null if shopping cart total couldn't be calculated now</returns>
         public virtual decimal? GetShoppingCartTotal(IList<ShoppingCartItem> cart,
             out decimal discountAmount, out List<Discount> appliedDiscounts,
             out List<AppliedGiftCard> appliedGiftCards,
             out int redeemedRewardPoints, out decimal redeemedRewardPointsAmount,
-            bool ignoreRewardPonts = false, bool usePaymentMethodAdditionalFee = true)
+            bool? useRewardPoints = null, bool usePaymentMethodAdditionalFee = true)
         {
             redeemedRewardPoints = 0;
             redeemedRewardPointsAmount = decimal.Zero;
@@ -1301,26 +1301,29 @@ namespace Nop.Services.Orders
 
             #region Reward points
 
-            if (_rewardPointsSettings.Enabled &&
-                !ignoreRewardPonts &&
-                customer.GetAttribute<bool>(SystemCustomerAttributeNames.UseRewardPointsDuringCheckout,
-                    _genericAttributeService, _storeContext.CurrentStore.Id))
+            if (_rewardPointsSettings.Enabled)
             {
-                int rewardPointsBalance = _rewardPointService.GetRewardPointsBalance(customer.Id, _storeContext.CurrentStore.Id);
-                if (CheckMinimumRewardPointsToUseRequirement(rewardPointsBalance))
+                if (!useRewardPoints.HasValue)
+                    useRewardPoints = customer.GetAttribute<bool>(SystemCustomerAttributeNames.UseRewardPointsDuringCheckout, _genericAttributeService, _storeContext.CurrentStore.Id);
+                if (useRewardPoints.Value)
                 {
-                    decimal rewardPointsBalanceAmount = ConvertRewardPointsToAmount(rewardPointsBalance);
-                    if (orderTotal > decimal.Zero)
+
+                    int rewardPointsBalance = _rewardPointService.GetRewardPointsBalance(customer.Id, _storeContext.CurrentStore.Id);
+                    if (CheckMinimumRewardPointsToUseRequirement(rewardPointsBalance))
                     {
-                        if (orderTotal > rewardPointsBalanceAmount)
+                        decimal rewardPointsBalanceAmount = ConvertRewardPointsToAmount(rewardPointsBalance);
+                        if (orderTotal > decimal.Zero)
                         {
-                            redeemedRewardPoints = rewardPointsBalance;
-                            redeemedRewardPointsAmount = rewardPointsBalanceAmount;
-                        }
-                        else
-                        {
-                            redeemedRewardPointsAmount = orderTotal;
-                            redeemedRewardPoints = ConvertAmountToRewardPoints(redeemedRewardPointsAmount);
+                            if (orderTotal > rewardPointsBalanceAmount)
+                            {
+                                redeemedRewardPoints = rewardPointsBalance;
+                                redeemedRewardPointsAmount = rewardPointsBalanceAmount;
+                            }
+                            else
+                            {
+                                redeemedRewardPointsAmount = orderTotal;
+                                redeemedRewardPoints = ConvertAmountToRewardPoints(redeemedRewardPointsAmount);
+                            }
                         }
                     }
                 }

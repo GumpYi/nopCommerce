@@ -774,8 +774,10 @@ namespace Nop.Services.Orders
                 return;
 
             //add reward points
+            var activatingDate = _rewardPointsSettings.ActivationDelay > 0
+                ? (DateTime?)(DateTime.UtcNow.AddHours(((RewardPointsActivatingDelayPeriod)_rewardPointsSettings.ActivationDelayPeriodId).ToHours(_rewardPointsSettings.ActivationDelay))) : null;
             _rewardPointService.AddRewardPointsHistoryEntry(order.Customer, points, order.StoreId,
-                string.Format(_localizationService.GetResource("RewardPoints.Message.EarnedForOrder"), order.Id));
+                string.Format(_localizationService.GetResource("RewardPoints.Message.EarnedForOrder"), order.Id), activatingDate: activatingDate);
             order.RewardPointsWereAdded = true;
             _orderService.UpdateOrder(order);
         }
@@ -1614,6 +1616,7 @@ namespace Nop.Services.Orders
                     RecurringCycleLength = recurringPayment.CycleLength,
                     RecurringCyclePeriod = recurringPayment.CyclePeriod,
                     RecurringTotalCycles = recurringPayment.TotalCycles,
+                    CustomValues = initialOrder.DeserializeCustomValues()
                 };
 
                 //prepare order details
@@ -2310,7 +2313,11 @@ namespace Nop.Services.Orders
             if (order.OrderTotal == decimal.Zero)
                 return false;
 
-            //uncomment the lines below in order to allow this operation for cancelled orders
+            //refund cannot be made if previously a partial refund has been already done. only other partial refund can be made in this case
+            if (order.RefundedAmount > decimal.Zero)
+                return false;
+
+            //uncomment the lines below in order to disallow this operation for cancelled orders
             //if (order.OrderStatus == OrderStatus.Cancelled)
             //    return false;
 
@@ -2439,7 +2446,11 @@ namespace Nop.Services.Orders
             if (order.OrderTotal == decimal.Zero)
                 return false;
 
-            //uncomment the lines below in order to allow this operation for cancelled orders
+            //refund cannot be made if previously a partial refund has been already done. only other partial refund can be made in this case
+            if (order.RefundedAmount > decimal.Zero)
+                return false;
+
+            //uncomment the lines below in order to disallow this operation for cancelled orders
             //if (order.OrderStatus == OrderStatus.Cancelled)
             //     return false;
 
